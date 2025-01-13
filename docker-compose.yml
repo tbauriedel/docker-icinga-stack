@@ -1,0 +1,103 @@
+version: '2'
+
+services:
+  icingaweb2:
+    image: icinga/icingaweb2
+    ports:
+      - 8080:8080
+    environment:
+      ICINGAWEB_TIMEZONE: 'Europe/Berlin'
+      icingaweb.passwords.icingaweb2.icinga: icinga
+      icingaweb.roles.Administrators.users: icinga
+      icingaweb.roles.Administrators.permissions: '*'
+      icingaweb.roles.Administrators.groups: Administrators
+      icingaweb.authentication.icingaweb2.backend: db
+      icingaweb.authentication.icingaweb2.resource: icingaweb_db
+      icingaweb.config.global.config_backend: db
+      icingaweb.config.global.config_resource: icingaweb_db
+      icingaweb.config.logging.log: php
+      icingaweb.groups.icingaweb2.backend: db
+      icingaweb.groups.icingaweb2.resource: icingaweb_db
+      icingaweb.resources.icingaweb_db.type: db
+      icingaweb.resources.icingaweb_db.db: mysql
+      icingaweb.resources.icingaweb_db.host: mariadb-icingaweb2
+      icingaweb.resources.icingaweb_db.dbname: icingaweb2
+      icingaweb.resources.icingaweb_db.username: icinga
+      icingaweb.resources.icingaweb_db.password: icinga
+      icingaweb.resources.icingaweb_db.charset: utf8mb4
+      icingaweb.resources.icingadb.type: db
+      icingaweb.resources.icingadb.db: mysql
+      icingaweb.resources.icingadb.host: mariadb-icingadb
+      icingaweb.resources.icingadb.port: 3306
+      icingaweb.resources.icingadb.dbname: icingadb
+      icingaweb.resources.icingadb.username: icinga
+      icingaweb.resources.icingadb.password: icinga
+      icingaweb.resources.icingadb.charset: utf8mb4
+      icingaweb.modules.icingadb.config.icingadb.resource: icingadb
+      icingaweb.modules.icingadb.redis.redis1.host: redis
+      icingaweb.modules.icingadb.redis.redis1.port: 6379
+      icingaweb.modules.icingadb.commandtransports.icinga2.transport: api
+      icingaweb.modules.icingadb.commandtransports.icinga2.host: icinga2
+      icingaweb.modules.icingadb.commandtransports.icinga2.username: icinga
+      icingaweb.modules.icingadb.commandtransports.icinga2.password: icinga
+      icingaweb.enabledModules: icingadb
+    depends_on:
+      - mariadb-icingaweb2
+      - mariadb-icingadb
+
+      - icinga2
+
+  mariadb-icingaweb2:
+    image: mariadb
+    volumes:
+      - ./.docker-volume-db-icingaweb2:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: icinga
+      MYSQL_DATABASE: icingaweb2
+      MYSQL_USER: icinga
+      MYSQL_PASSWORD: icinga
+  
+  mariadb-icingadb:
+    image: mariadb
+    volumes:
+      - ./.docker-volume-db-icingadb:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: icinga
+      MYSQL_DATABASE: icingadb
+      MYSQL_USER: icinga
+      MYSQL_PASSWORD: icinga
+
+  redis:
+    image: redis
+
+  icingadb:
+    image: icinga/icingadb
+    environment:
+      ICINGADB_REDIS_HOST: redis
+      ICINGADB_REDIS_PORT: 6379
+      ICINGADB_DATABASE_HOST: mariadb-icingadb
+      ICINGADB_DATABASE_PORT: 3306
+      ICINGADB_DATABASE_DATABASE: icingadb
+      ICINGADB_DATABASE_USER: icinga
+      ICINGADB_DATABASE_PASSWORD: icinga
+    depends_on:
+      - redis
+      - mariadb-icingadb
+
+  icinga2:
+    image: icinga/icinga2
+    volumes:
+      - ./etc/icinga2/conf.d/:/etc/icinga2/conf.d
+      - ./etc/icinga2/icinga2.conf:/etc/icinga2/icinga2.conf
+      - ./etc/icinga2/zones.conf:/etc/icinga2/zones.conf
+      - ./etc/icinga2/constants.conf:/etc/icinga2/constants.conf
+      - ./etc/icinga2/api-users.conf:/etc/icinga2/api-users.conf
+      - ./etc/icinga2/features-enabled/api.conf:/etc/icinga2/features-enabled/api.conf
+      - ./etc/icinga2/features-enabled/icingadb.conf:/etc/icinga2/features-enabled/icingadb.conf
+    environment:
+      ICINGA_MASTER: 1
+      ICINGA_LISTEN: '::,5665'
+      ICINGA_ZONE: main
+      ICINGA_CN: icinga2
+      ICINGA_DISABLE_CONFD: 1
+    restart: unless-stopped
